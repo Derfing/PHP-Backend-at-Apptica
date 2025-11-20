@@ -1,61 +1,225 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# PHP Backend для Apptica
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+## Описание проекта
 
-## About Laravel
+Это PHP-backend приложение, разработанное на фреймворке Laravel 12, которое интегрируется с API сервиса Apptica для получения и обработки данных о позициях приложений в топ-чартах различных категорий App Store.
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+## Основная функциональность
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+Проект предоставляет RESTful API для получения минимальных позиций приложения по категориям на конкретную дату. Система:
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+- Получает данные о позициях приложений в топ-чартах через Apptica API
+- Агрегирует данные по категориям (выбирает минимальную позицию среди подкатегорий)
+- Кэширует полученные данные в базе данных для оптимизации повторных запросов
+- Обеспечивает защиту от чрезмерного количества запросов (rate limiting)
+- Логирует все входящие запросы
 
-## Learning Laravel
+## Технологический стек
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
+- **PHP**: ^8.2
+- **Laravel Framework**: ^12.0
+- **База данных**: SQLite (по умолчанию, легко настраивается на MySQL/PostgreSQL)
+- **Пакеты**:
+  - `spatie/laravel-data` - для работы с DTO (Data Transfer Objects)
+  - Laravel Tinker - для интерактивной работы с приложением
+  - PHPUnit - для тестирования
+  - Laravel Pint - для форматирования кода
 
-You may also try the [Laravel Bootcamp](https://bootcamp.laravel.com), where you will be guided through building a modern Laravel application from scratch.
+## Архитектура
 
-If you don't feel like reading, [Laracasts](https://laracasts.com) can help. Laracasts contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+Проект следует принципам чистой архитектуры и SOLID:
 
-## Laravel Sponsors
+### Слои приложения
 
-We would like to extend our thanks to the following sponsors for funding Laravel development. If you are interested in becoming a sponsor, please visit the [Laravel Partners program](https://partners.laravel.com).
+1. **Controllers** (`app/Http/Controllers`)
+   - `AppTopController` - обрабатывает HTTP-запросы для получения позиций приложений
 
-### Premium Partners
+2. **Services** (`app/Services`)
+   - `AppTopService` - бизнес-логика получения и агрегации данных
 
-- **[Vehikl](https://vehikl.com)**
-- **[Tighten Co.](https://tighten.co)**
-- **[Kirschbaum Development Group](https://kirschbaumdevelopment.com)**
-- **[64 Robots](https://64robots.com)**
-- **[Curotec](https://www.curotec.com/services/technologies/laravel)**
-- **[DevSquad](https://devsquad.com/hire-laravel-developers)**
-- **[Redberry](https://redberry.international/laravel-development)**
-- **[Active Logic](https://activelogic.com)**
+3. **Clients** (`app/Clients`)
+   - `AppticaApiClient` - HTTP-клиент для взаимодействия с Apptica API
 
-## Contributing
+4. **Repositories** (`app/Repositories`)
+   - Репозитории для работы с данными (паттерн Repository)
+   - Использование интерфейсов для слабой связанности
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+5. **Models** (`app/Models`)
+   - `CategoryPosition` - Eloquent модель для хранения позиций по категориям
 
-## Code of Conduct
+## API Endpoints
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+### GET /api/appTopCategory
 
-## Security Vulnerabilities
+Получает минимальные позиции приложения по категориям на указанную дату.
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+**Параметры запроса:**
+- `date` (required) - дата в формате `Y-m-d` (например, `2025-08-20`)
 
-## License
+**Пример запроса:**
+```bash
+GET /api/appTopCategory?date=2025-08-20
+```
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+**Пример ответа:**
+```json
+{
+  "status_code": 200,
+  "message": "ok",
+  "data": {
+    "2": 50,
+    "23": 10,
+    "99": 5
+  }
+}
+```
+
+**Защита:**
+- Rate limiting: 5 запросов в минуту
+- Middleware для логирования запросов
+
+## Особенности реализации
+
+### Агрегация данных
+
+Система получает данные от Apptica API в следующем формате:
+```json
+{
+  "category_id": {
+    "subcategory_id": {
+      "date": position
+    }
+  }
+}
+```
+
+И агрегирует их, выбирая минимальную позицию среди всех подкатегорий для каждой категории, игнорируя null-значения.
+
+### Кэширование
+
+Данные кэшируются в базе данных с уникальным ключом `(date, category_id)`, что позволяет избежать повторных запросов к Apptica API для одних и тех же дат.
+
+### Обработка ошибок
+
+- Автоматические повторные попытки при сбоях (до 3 попыток)
+- Кастомные исключения (`AppticaApiException`)
+- Корректная обработка таймаутов и ошибок подключения
+
+## Установка и запуск
+
+### Требования
+
+- PHP >= 8.2
+- Composer
+- Node.js и npm (для frontend-ресурсов)
+
+### Установка
+
+1. Клонируйте репозиторий:
+```bash
+git clone https://github.com/Derfing/PHP-Backend-at-Apptica.git
+cd PHP-Backend-at-Apptica
+```
+
+2. Установите зависимости:
+```bash
+composer install
+npm install
+```
+
+3. Настройте окружение:
+```bash
+cp .env.example .env
+php artisan key:generate
+```
+
+4. Добавьте ваш Apptica API ключ в `.env`:
+```env
+APPTICA_SECRET=your_api_key_here
+```
+
+5. Выполните миграции:
+```bash
+php artisan migrate
+```
+
+### Запуск для разработки
+
+```bash
+composer run dev
+```
+
+Эта команда запустит одновременно:
+- PHP сервер (артисан)
+- Queue worker для фоновых задач
+- Vite для frontend-ресурсов
+- Pail для просмотра логов
+
+Или запускайте компоненты отдельно:
+```bash
+php artisan serve
+```
+
+## Тестирование
+
+Проект покрыт автоматическими тестами (Feature и Unit тесты).
+
+### Запуск тестов
+
+```bash
+composer test
+# или
+php artisan test
+```
+
+### Тестовое покрытие
+
+- Проверка корректной агрегации данных
+- Обработка ошибок API
+- Работа с null-значениями
+- Обработка больших объемов данных (50+ категорий)
+
+## Линтинг и форматирование кода
+
+Проект использует Laravel Pint для форматирования кода:
+
+```bash
+./vendor/bin/pint
+```
+
+## Структура базы данных
+
+### Таблица `category_positions`
+
+- `id` - первичный ключ
+- `date` - дата позиции
+- `category_id` - идентификатор категории
+- `position` - позиция в топе
+- `timestamps` - временные метки создания/обновления
+- Уникальный индекс: `(date, category_id)`
+
+## Конфигурация
+
+### Apptica API
+
+Настройки в `config/apptica_api.php`:
+- `secret` - API ключ для Apptica (из переменной окружения `APPTICA_SECRET`)
+
+### Параметры API-клиента
+
+- **Таймаут**: 10 секунд
+- **Максимальное количество попыток**: 3
+- **Задержка между попытками**: экспоненциальная (1, 2, 3 секунды)
+
+## Мониторинг и логирование
+
+- Все запросы логируются через middleware `LogRequests`
+- Laravel Pail используется для удобного просмотра логов в реальном времени
+
+## Лицензия
+
+MIT License
+
+## Поддержка
+
+По вопросам и предложениям создавайте Issues в репозитории проекта.
